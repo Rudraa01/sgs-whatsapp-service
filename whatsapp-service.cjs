@@ -12,6 +12,8 @@ let qrCodeData = null;
 let clientStatus = 'disconnected'; // 'disconnected', 'connecting', 'qr_ready', 'connected'
 let clientInstance = null;
 
+let lastError = null;
+
 // Initialize WhatsApp client
 function createClient() {
     const c = new Client({
@@ -35,6 +37,7 @@ function createClient() {
     // QR Code Event
     c.on('qr', (qr) => {
         clientStatus = 'qr_ready';
+        lastError = null;
         
         // Print QR in logs for console scanning
         console.log('\n--- SCAN THIS QR CODE TO CONNECT ---');
@@ -48,6 +51,7 @@ function createClient() {
                 console.log('[WhatsApp] QR Code generated successfully.');
             } else {
                 console.error('[WhatsApp] Failed to convert QR to Data URL:', err);
+                lastError = 'QR conversion error: ' + err.message;
             }
         });
     });
@@ -56,6 +60,7 @@ function createClient() {
     c.on('ready', () => {
         clientStatus = 'connected';
         qrCodeData = null;
+        lastError = null;
         console.log('[WhatsApp] Client is ready and connected!');
     });
 
@@ -68,6 +73,7 @@ function createClient() {
     c.on('auth_failure', (msg) => {
         clientStatus = 'disconnected';
         qrCodeData = null;
+        lastError = 'Auth failure: ' + msg;
         console.error('[WhatsApp] Authentication failed:', msg);
     });
 
@@ -75,6 +81,7 @@ function createClient() {
     c.on('disconnected', (reason) => {
         clientStatus = 'disconnected';
         qrCodeData = null;
+        lastError = 'Client disconnected: ' + reason;
         console.log('[WhatsApp] Client disconnected:', reason);
     });
 
@@ -88,6 +95,7 @@ function startClient() {
         return;
     }
     clientStatus = 'connecting';
+    lastError = null;
     console.log('[WhatsApp] Initializing WhatsApp Client...');
 
     try {
@@ -95,11 +103,13 @@ function startClient() {
         clientInstance.initialize().catch(err => {
             console.error('[WhatsApp] Error during initialization promise:', err);
             clientStatus = 'disconnected';
+            lastError = err.message || String(err);
             qrCodeData = null;
         });
     } catch (err) {
         console.error('[WhatsApp] Synchronous error initializing client:', err);
         clientStatus = 'disconnected';
+        lastError = err.message || String(err);
         qrCodeData = null;
     }
 }
@@ -146,7 +156,8 @@ startClient();
 app.get('/status', (req, res) => {
     res.json({
         status: clientStatus,
-        qr: qrCodeData
+        qr: qrCodeData,
+        error: lastError
     });
 });
 
